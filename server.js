@@ -26,7 +26,31 @@ var getRelatedArtists = function(res, artist){
 
     relatedReq.on('end', function(relatedArtists){
         artist.related = relatedArtists.artists;
-        res.json(artist);
+        var trackLookupCount = 0;
+        var totalRelatedArtists = artist.related.length;
+        var lookupComplete = function() {
+            if (trackLookupCount === totalRelatedArtists) {
+                res.json(artist);
+            }
+        };
+
+        artist.related.forEach(function(relatedArtist) {
+            var topTracksReq = getFromApi(
+                'artists/' + relatedArtist.id + '/top-tracks', 
+                { country: 'US' }
+            );
+
+            topTracksReq.on('end', function(list) {
+                relatedArtist.tracks = list.tracks;
+                trackLookupCount += 1;
+                lookupComplete();
+            });
+
+            topTracksReq.on('error', function() {
+                res.sendStatus(404);
+            });
+        });
+        
     });
 
     relatedReq.on('error', function() {
@@ -34,6 +58,7 @@ var getRelatedArtists = function(res, artist){
         res.end();
     });
 };
+
 
 app.get('/search/:name', function(req, res) {
     var searchReq = getFromApi('search', {
